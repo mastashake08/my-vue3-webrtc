@@ -1,0 +1,42 @@
+name: Deploy Vue App to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main  # Change this if your default branch is different
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write  # Grants permission to deploy to GitHub Pages
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20  # Ensure compatibility with Vue 3
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Vue App
+        run: npm run build
+
+      - name: Configure GitHub Pages
+        run: |
+          mkdir -p dist && echo "your-github-username.github.io" > dist/CNAME
+        if: success()
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages  # The branch to deploy to
+          folder: dist  # The folder containing the build output

@@ -1,0 +1,21 @@
+{
+  "name": "my-vue3-webrtc",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@mastashake08/zlib-urlsafe": "^1.0.3",
+    "jsqr": "^1.4.0",
+    "vue": "^3.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "vite": "^4.0.0"
+  }
+}
