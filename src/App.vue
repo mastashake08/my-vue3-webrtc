@@ -18,70 +18,66 @@
       class="max-w-xl text-center mb-8 bg-black/50 p-4 rounded-lg shadow-md neon-border"
     >
       <p class="mb-2">
-        1) Choose your camera and microphone below.
+        1) Choose your camera and microphone, or click <b>Share Screen</b> to capture your desktop.
       </p>
       <p class="mb-2">
-        2) Click <b>Start Camera</b> to begin QR scanning and see the preview.
+        2) Click <b>Start Camera</b> (if using camera) or <b>Share Screen</b> to see a live preview.
       </p>
       <p class="mb-2">
         3) Show a QR code with a zlib-compressed, Base64-encoded <em>SDP offer</em>.
       </p>
       <p class="mb-2">
-        4) When scanned, this side sets up a <strong>send-only</strong> WebRTC
-        call (audio/video).
+        4) This side sets up a <strong>send-only</strong> WebRTC call (audio/video or screen).
       </p>
       <p class="mb-2">
-        5) Use <b>Mute Audio</b> to disable your mic, or <b>Stop Camera</b> to
-        end the local stream entirely.
+        5) Use <b>Mute Audio</b> to disable your mic, or <b>Stop</b> to end the local stream.
       </p>
     </div>
 
-    <!-- Device Selection Row -->
-    <!-- Wrap camera + microphone selection in a parent container that is centered -->
-<div class="flex flex-col items-center justify-center gap-4 w-full max-w-xl mb-6">
-  <!-- Camera Selection -->
-  <div class="w-full flex flex-col items-center">
-    <label class="mb-1 font-semibold text-sm uppercase tracking-wider text-center">
-      Select Camera:
-    </label>
-    <select
-      v-model="selectedCamera"
-      class="text-black px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400"
-    >
-      <option value="" disabled>Select a camera</option>
-      <option
-        v-for="(cam, idx) in cameras"
-        :key="cam.deviceId"
-        :value="cam.deviceId"
-      >
-        {{ cam.label || 'Camera ' + (idx + 1) }}
-      </option>
-    </select>
-  </div>
+    <!-- Device Selection Container: Centered -->
+    <div class="flex flex-col items-center justify-center gap-4 w-full max-w-xl mb-6">
+      <!-- Camera Selection -->
+      <div class="w-full flex flex-col items-center">
+        <label class="mb-1 font-semibold text-sm uppercase tracking-wider text-center">
+          Select Camera:
+        </label>
+        <select
+          v-model="selectedCamera"
+          class="text-black px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400"
+        >
+          <option value="" disabled>Select a camera</option>
+          <option
+            v-for="(cam, idx) in cameras"
+            :key="cam.deviceId"
+            :value="cam.deviceId"
+          >
+            {{ cam.label || 'Camera ' + (idx + 1) }}
+          </option>
+        </select>
+      </div>
 
-  <!-- Microphone Selection -->
-  <div class="w-full flex flex-col items-center">
-    <label class="mb-1 font-semibold text-sm uppercase tracking-wider text-center">
-      Select Microphone:
-    </label>
-    <select
-      v-model="selectedMicrophone"
-      class="text-black px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400"
-    >
-      <option value="" disabled>Select a microphone</option>
-      <option
-        v-for="(mic, idx) in microphones"
-        :key="mic.deviceId"
-        :value="mic.deviceId"
-      >
-        {{ mic.label || 'Microphone ' + (idx + 1) }}
-      </option>
-    </select>
-  </div>
-</div>
+      <!-- Microphone Selection -->
+      <div class="w-full flex flex-col items-center">
+        <label class="mb-1 font-semibold text-sm uppercase tracking-wider text-center">
+          Select Microphone:
+        </label>
+        <select
+          v-model="selectedMicrophone"
+          class="text-black px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400"
+        >
+          <option value="" disabled>Select a microphone</option>
+          <option
+            v-for="(mic, idx) in microphones"
+            :key="mic.deviceId"
+            :value="mic.deviceId"
+          >
+            {{ mic.label || 'Microphone ' + (idx + 1) }}
+          </option>
+        </select>
+      </div>
+    </div>
 
-
-    <!-- Video Preview -->
+    <!-- Video (or Screen) Preview -->
     <video
       ref="videoElem"
       class="border border-lime-400 rounded-lg mb-4 glow-border"
@@ -106,6 +102,15 @@
         Start Camera
       </button>
 
+      <!-- Share Screen (only if getDisplayMedia is available) -->
+      <button
+        v-if="isScreenShareSupported"
+        class="px-5 py-2 border border-lime-400 text-lime-300 hover:bg-lime-400 hover:text-black rounded-full transition-colors duration-300 shadow-neon"
+        @click="startScreenShare"
+      >
+        Share Screen
+      </button>
+
       <!-- Mute/Unmute Audio -->
       <button
         v-if="localStream"
@@ -115,20 +120,20 @@
         {{ isMuted ? 'Unmute Audio' : 'Mute Audio' }}
       </button>
 
-      <!-- Stop Camera -->
+      <!-- Stop Camera/Screen -->
       <button
         v-if="localStream"
         class="px-5 py-2 border border-lime-400 text-lime-300 hover:bg-lime-400 hover:text-black rounded-full transition-colors duration-300 shadow-neon"
         @click="stopCamera"
       >
-        Stop Camera
+        Stop
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import jsQR from 'jsqr'
 import { decompressZlibBase64UrlSafe } from '@mastashake08/zlib-urlsafe'
 
@@ -153,6 +158,11 @@ const selectedMicrophone = ref('')
 
 // Mute state
 const isMuted = ref(false)
+
+/** Check if screen sharing is supported */
+const isScreenShareSupported = computed(() => {
+  return !!navigator.mediaDevices?.getDisplayMedia
+})
 
 /** onMounted: enumerate devices */
 onMounted(() => {
@@ -193,10 +203,17 @@ async function startCamera() {
         ? { deviceId: { exact: selectedMicrophone.value } }
         : true,
     }
+
+    // Stop any old stream first
+    if (localStream.value) {
+      localStream.value.getTracks().forEach(t => t.stop())
+    }
+
     localStream.value = await navigator.mediaDevices.getUserMedia(constraints)
     videoElem.value.srcObject = localStream.value
     cameraActive.value = true
     isMuted.value = false  // default to unmuted
+    listenForTrackEnd(localStream.value)
     requestAnimationFrame(scanFrame)
   } catch (err) {
     error.value = `Camera error: ${err.message}`
@@ -204,7 +221,52 @@ async function startCamera() {
   }
 }
 
-/** Mute/Unmute local audio tracks */
+/** Start Screen Share (video only) */
+async function startScreenShare() {
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    error.value = 'Screen sharing not supported in this browser.'
+    return
+  }
+
+  try {
+    // Stop any old stream (camera or previous screen)
+    if (localStream.value) {
+      localStream.value.getTracks().forEach(t => t.stop())
+    }
+
+    // Get screen capture (video only by default)
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true
+      // audio: true  <-- partially supported in some browsers if you want system audio
+    })
+
+    localStream.value = screenStream
+    videoElem.value.srcObject = localStream.value
+    cameraActive.value = true
+    isMuted.value = false  // no built-in mic here, but let's keep consistent
+
+    listenForTrackEnd(localStream.value)
+    requestAnimationFrame(scanFrame)
+  } catch (err) {
+    error.value = `Screen share error: ${err.message}`
+    console.error(err)
+  }
+}
+
+/** If a user stops screen share or camera track externally, handle track.onended */
+function listenForTrackEnd(stream) {
+  stream.getTracks().forEach(track => {
+    track.onended = () => {
+      console.log('Track ended:', track)
+      // e.g., user clicked "Stop sharing" in the browser prompt
+      // You could automatically do 'stopCamera()' or revert to camera
+      // For now, we just do:
+      stopCamera()
+    }
+  })
+}
+
+/** Mute/Unmute local audio tracks (if any) */
 function toggleMute() {
   if (!localStream.value) return
   isMuted.value = !isMuted.value
@@ -213,7 +275,7 @@ function toggleMute() {
   })
 }
 
-/** Stop Camera (turn off tracks, clear stream) */
+/** Stop Camera (or screen) */
 function stopCamera() {
   if (!localStream.value) return
   localStream.value.getTracks().forEach(t => t.stop())
@@ -260,9 +322,9 @@ async function handleOfferSDP(scannedString) {
     // 2. Create PeerConnection
     pc = new RTCPeerConnection()
 
-    // 3. Add local tracks if camera is active
+    // 3. Add local tracks if camera/screen is active
     if (!localStream.value) {
-      error.value = 'No local stream. Please start camera/mic first.'
+      error.value = 'No local stream. Please start camera or screen share first.'
       return
     }
     localStream.value.getTracks().forEach(track => {
@@ -288,7 +350,6 @@ async function handleOfferSDP(scannedString) {
 <style scoped>
 /* 
   A neon-like text glow:
-  Adjust #0f0 to your preference for other neon colors 
 */
 .neon-text {
   text-shadow:
