@@ -18,9 +18,13 @@ export default defineConfig({
         background_color: '#000000',
         display: 'standalone',
         icons: [
-          
           {
-            src: '/pwa-logo.svg',
+            src: `/${repoName}/pwa-logo.svg`,
+            sizes: '144x144',
+            type: 'image/svg'
+          },
+          {
+            src: `/${repoName}/pwa-logo.svg`,
             sizes: '512x512',
             type: 'image/svg'
           }

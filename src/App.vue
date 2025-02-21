@@ -18,16 +18,16 @@
       class="max-w-xl text-center mb-8 bg-black/50 p-4 rounded-lg shadow-md neon-border"
     >
       <p class="mb-2">
-        1) Choose your camera and microphone, or click <b>Share Screen</b> to capture your desktop.
+        1) Choose your camera (or screen) & microphone, or click <b>Share Screen</b> to capture your desktop.
       </p>
       <p class="mb-2">
-        2) Click <b>Start Camera</b> (if using camera) or <b>Share Screen</b> to see a live preview.
+        2) Click <b>Start Camera</b> or <b>Share Screen</b> to see a live preview and start scanning (if camera).
       </p>
       <p class="mb-2">
-        3) Show a QR code with a zlib-compressed, Base64-encoded <em>SDP offer</em>.
+        3) Show a QR code with a zlib-compressed, Base64-encoded <em>SDP offer</em> OR paste an SDP below.
       </p>
       <p class="mb-2">
-        4) This side sets up a <strong>send-only</strong> WebRTC call (audio/video or screen).
+        4) This side sets up a <strong>send-only</strong> WebRTC call (camera/screen + mic).
       </p>
       <p class="mb-2">
         5) Use <b>Mute Audio</b> to disable your mic, or <b>Stop</b> to end the local stream.
@@ -92,8 +92,8 @@
 {{ decompressedSDP }}
     </pre>
 
-    <!-- Action Buttons -->
-    <div class="flex flex-row flex-wrap gap-4">
+    <!-- Action Buttons Row 1 -->
+    <div class="flex flex-row flex-wrap gap-4 mb-4">
       <!-- Start Camera/Mic -->
       <button
         class="px-5 py-2 border border-lime-400 text-lime-300 hover:bg-lime-400 hover:text-black rounded-full transition-colors duration-300 shadow-neon"
@@ -129,6 +129,36 @@
         Stop
       </button>
     </div>
+
+    <!-- Paste SDP Option -->
+    <div class="flex flex-col items-center gap-3 w-full max-w-xl mb-8 bg-black/40 p-4 rounded neon-border">
+      <label class="text-center font-semibold">
+        Don't have a QR code? Paste the SDP offer here:
+      </label>
+      <textarea
+        v-model="pastedSdp"
+        rows="3"
+        class="w-full text-black rounded p-2 focus:outline-none focus:ring-2 focus:ring-lime-400"
+        placeholder="Paste remote SDP or compressed string"
+      ></textarea>
+
+      <div class="flex items-center gap-2">
+        <input
+          id="chkCompressed"
+          type="checkbox"
+          v-model="isPastedSdpCompressed"
+          class="h-4 w-4 accent-lime-400"
+        />
+        <label for="chkCompressed" class="text-sm">This is a zlib-compressed, Base64-encoded string</label>
+      </div>
+
+      <button
+        class="px-5 py-2 border border-lime-400 text-lime-300 hover:bg-lime-400 hover:text-black rounded-full transition-colors duration-300 shadow-neon"
+        @click="usePastedSDP"
+      >
+        Set as Remote Offer
+      </button>
+    </div>
   </div>
 </template>
 
@@ -159,12 +189,15 @@ const selectedMicrophone = ref('')
 // Mute state
 const isMuted = ref(false)
 
+// For Pasting SDP
+const pastedSdp = ref('')
+const isPastedSdpCompressed = ref(false)
+
 /** Check if screen sharing is supported */
 const isScreenShareSupported = computed(() => {
   return !!navigator.mediaDevices?.getDisplayMedia
 })
 
-/** onMounted: enumerate devices */
 onMounted(() => {
   loadDeviceList()
 })
@@ -187,7 +220,7 @@ async function loadDeviceList() {
   }
 }
 
-/** Start Camera & Microphone with chosen devices */
+/** Start Camera & Microphone */
 async function startCamera() {
   if (!selectedCamera.value && !selectedMicrophone.value) {
     error.value = 'Please select a camera and a microphone first.'
@@ -195,6 +228,9 @@ async function startCamera() {
   }
 
   try {
+    // Stop existing stream first
+    stopCamera()
+
     const constraints = {
       video: selectedCamera.value
         ? { deviceId: { exact: selectedCamera.value } }
@@ -203,16 +239,10 @@ async function startCamera() {
         ? { deviceId: { exact: selectedMicrophone.value } }
         : true,
     }
-
-    // Stop any old stream first
-    if (localStream.value) {
-      localStream.value.getTracks().forEach(t => t.stop())
-    }
-
     localStream.value = await navigator.mediaDevices.getUserMedia(constraints)
     videoElem.value.srcObject = localStream.value
     cameraActive.value = true
-    isMuted.value = false  // default to unmuted
+    isMuted.value = false
     listenForTrackEnd(localStream.value)
     requestAnimationFrame(scanFrame)
   } catch (err) {
@@ -227,24 +257,19 @@ async function startScreenShare() {
     error.value = 'Screen sharing not supported in this browser.'
     return
   }
-
   try {
-    // Stop any old stream (camera or previous screen)
-    if (localStream.value) {
-      localStream.value.getTracks().forEach(t => t.stop())
-    }
+    // Stop existing stream first
+    stopCamera()
 
-    // Get screen capture (video only by default)
     const screenStream = await navigator.mediaDevices.getDisplayMedia({
       video: true
-      // audio: true  <-- partially supported in some browsers if you want system audio
+      // audio: true, // partially supported in some browsers if you want system audio
     })
 
     localStream.value = screenStream
     videoElem.value.srcObject = localStream.value
     cameraActive.value = true
-    isMuted.value = false  // no built-in mic here, but let's keep consistent
-
+    isMuted.value = false
     listenForTrackEnd(localStream.value)
     requestAnimationFrame(scanFrame)
   } catch (err) {
@@ -253,20 +278,18 @@ async function startScreenShare() {
   }
 }
 
-/** If a user stops screen share or camera track externally, handle track.onended */
+/** Listen if the user stops camera or screen track externally */
 function listenForTrackEnd(stream) {
   stream.getTracks().forEach(track => {
     track.onended = () => {
       console.log('Track ended:', track)
-      // e.g., user clicked "Stop sharing" in the browser prompt
-      // You could automatically do 'stopCamera()' or revert to camera
-      // For now, we just do:
+      // If user clicks "Stop sharing" from browser's UI or physically stops camera
       stopCamera()
     }
   })
 }
 
-/** Mute/Unmute local audio tracks (if any) */
+/** Mute/Unmute local audio tracks */
 function toggleMute() {
   if (!localStream.value) return
   isMuted.value = !isMuted.value
@@ -275,15 +298,16 @@ function toggleMute() {
   })
 }
 
-/** Stop Camera (or screen) */
+/** Stop current camera or screen stream */
 function stopCamera() {
-  if (!localStream.value) return
-  localStream.value.getTracks().forEach(t => t.stop())
+  if (localStream.value) {
+    localStream.value.getTracks().forEach(t => t.stop())
+  }
   localStream.value = null
   cameraActive.value = false
 }
 
-/** Continuously scan video feed for QR codes */
+/** Continuously scan video feed for QR codes (zlib-compressed) */
 function scanFrame() {
   if (!cameraActive.value) return
 
@@ -305,41 +329,59 @@ function scanFrame() {
   if (code && code.data) {
     qrFound.value = true
     qrText.value = code.data
-    handleOfferSDP(code.data)
+    // Call our unified handler, telling it "this is compressed"
+    handleOfferString(code.data, true)
   } else {
     requestAnimationFrame(scanFrame)
   }
 }
 
-/** Decompress QR code's SDP & create send-only WebRTC answer */
-async function handleOfferSDP(scannedString) {
-  try {
-    // 1. Decompress the scanned string
-    const sdp = await decompressZlibBase64UrlSafe(scannedString)
-    decompressedSDP.value = sdp
-    console.log('[App] Decompressed offer SDP:', sdp)
+/** Handle user-pasted SDP (possibly compressed) */
+function usePastedSDP() {
+  if (!pastedSdp.value) {
+    error.value = 'No SDP provided.'
+    return
+  }
+  handleOfferString(pastedSdp.value, isPastedSdpCompressed.value)
+}
 
-    // 2. Create PeerConnection
+/** 
+ * Unified method to handle an offer string. 
+ * If 'isCompressed' == true, we decompress it. 
+ * Otherwise, we assume it's raw SDP.
+ */
+async function handleOfferString(offerStr, isCompressed) {
+  try {
+    let sdp
+    if (isCompressed) {
+      sdp = await decompressZlibBase64UrlSafe(offerStr)
+    } else {
+      sdp = offerStr
+    }
+    decompressedSDP.value = sdp
+    console.log('[App] Received/Decompressed offer SDP:', sdp)
+
+    // 1. Create / re-create a PeerConnection
     pc = new RTCPeerConnection()
 
-    // 3. Add local tracks if camera/screen is active
+    // 2. Add local tracks if we have a localStream
     if (!localStream.value) {
-      error.value = 'No local stream. Please start camera or screen share first.'
+      error.value = 'No local stream. Please start camera/screen first.'
       return
     }
     localStream.value.getTracks().forEach(track => {
       pc.addTrack(track, localStream.value)
     })
 
-    // 4. Set remote description (offer)
+    // 3. Set remote description (offer)
     await pc.setRemoteDescription({ type: 'offer', sdp })
 
-    // 5. Create and set local answer
+    // 4. Create and set local answer (send-only)
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     console.log('[App] Local answer SDP:', pc.localDescription.sdp)
 
-    // In a real app, also exchange ICE candidates
+    // Exchange ICE candidates in a real app
   } catch (err) {
     error.value = `Decompression/WebRTC error: ${err.message}`
     console.error(err)
@@ -348,9 +390,7 @@ async function handleOfferSDP(scannedString) {
 </script>
 
 <style scoped>
-/* 
-  A neon-like text glow:
-*/
+/* A neon-like text glow */
 .neon-text {
   text-shadow:
     0 0 5px #0f0,
@@ -371,7 +411,7 @@ async function handleOfferSDP(scannedString) {
     0 0 15px rgba(0, 255, 0, 0.3);
 }
 
-/* A neon ring around container (or set for .neon-border) */
+/* A neon ring around container */
 .neon-border {
   border: 1px solid #0f0;
   box-shadow:
