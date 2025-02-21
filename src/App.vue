@@ -1,63 +1,106 @@
 <template>
-  <div class="min-h-screen bg-black text-green-400 flex flex-col items-center justify-center p-4">
-    <h1 class="text-3xl font-bold mb-4">Neon QR Scanner</h1>
+  <div class="min-h-screen w-full bg-gradient-to-br from-gray-900 to-black text-lime-300 flex flex-col items-center p-6">
+    <h1 class="text-4xl font-extrabold neon-text mb-6 uppercase tracking-wide">
+      WebRTC QR Signaling Vue 3
+    </h1>
 
-    <!-- Camera Selection -->
-    <div class="flex flex-col items-start mb-2">
-      <label class="mb-1">Select Camera:</label>
-      <select
-        v-model="selectedCamera"
-        class="text-black px-2 py-1"
-      >
-        <option value="" disabled>Select a camera</option>
-        <option
-          v-for="(cam, idx) in cameras"
-          :key="cam.deviceId"
-          :value="cam.deviceId"
-        >
-          {{ cam.label || "Camera " + (idx + 1) }}
-        </option>
-      </select>
+    <!-- Toggleable Info -->
+    <button
+      class="mb-6 px-5 py-2 border border-lime-400 text-lime-300 hover:bg-lime-400 hover:text-black rounded-full transition-colors duration-300 shadow-neon"
+      @click="showInfo = !showInfo"
+    >
+      {{ showInfo ? 'Hide' : 'Show' }} Info
+    </button>
+
+    <!-- How-To Section -->
+    <div
+      v-if="showInfo"
+      class="max-w-xl text-center mb-8 bg-black/50 p-4 rounded-lg shadow-md neon-border"
+    >
+      <p class="mb-2">
+        1) Choose your camera and microphone below.
+      </p>
+      <p class="mb-2">
+        2) Click <b>Start Camera</b> to begin QR scanning and see the preview.
+      </p>
+      <p class="mb-2">
+        3) Show a QR code with a zlib-compressed, Base64-encoded <em>SDP offer</em>.
+      </p>
+      <p class="mb-2">
+        4) When scanned, this side sets up a <strong>send-only</strong> WebRTC
+        call (audio/video).
+      </p>
+      <p class="mb-2">
+        5) Use <b>Mute Audio</b> to disable your mic, or <b>Stop Camera</b> to
+        end the local stream entirely.
+      </p>
     </div>
 
-    <!-- Microphone Selection -->
-    <div class="flex flex-col items-start mb-4">
-      <label class="mb-1">Select Microphone:</label>
-      <select
-        v-model="selectedMicrophone"
-        class="text-black px-2 py-1"
+    <!-- Device Selection Row -->
+    <!-- Wrap camera + microphone selection in a parent container that is centered -->
+<div class="flex flex-col items-center justify-center gap-4 w-full max-w-xl mb-6">
+  <!-- Camera Selection -->
+  <div class="w-full flex flex-col items-center">
+    <label class="mb-1 font-semibold text-sm uppercase tracking-wider text-center">
+      Select Camera:
+    </label>
+    <select
+      v-model="selectedCamera"
+      class="text-black px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400"
+    >
+      <option value="" disabled>Select a camera</option>
+      <option
+        v-for="(cam, idx) in cameras"
+        :key="cam.deviceId"
+        :value="cam.deviceId"
       >
-        <option value="" disabled>Select a microphone</option>
-        <option
-          v-for="(mic, idx) in microphones"
-          :key="mic.deviceId"
-          :value="mic.deviceId"
-        >
-          {{ mic.label || "Microphone " + (idx + 1) }}
-        </option>
-      </select>
-    </div>
+        {{ cam.label || 'Camera ' + (idx + 1) }}
+      </option>
+    </select>
+  </div>
+
+  <!-- Microphone Selection -->
+  <div class="w-full flex flex-col items-center">
+    <label class="mb-1 font-semibold text-sm uppercase tracking-wider text-center">
+      Select Microphone:
+    </label>
+    <select
+      v-model="selectedMicrophone"
+      class="text-black px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400"
+    >
+      <option value="" disabled>Select a microphone</option>
+      <option
+        v-for="(mic, idx) in microphones"
+        :key="mic.deviceId"
+        :value="mic.deviceId"
+      >
+        {{ mic.label || 'Microphone ' + (idx + 1) }}
+      </option>
+    </select>
+  </div>
+</div>
+
 
     <!-- Video Preview -->
     <video
       ref="videoElem"
-      class="border border-green-400 rounded mb-4"
+      class="border border-lime-400 rounded-lg mb-4 glow-border"
       width="320"
       height="240"
       autoplay
       playsinline
     ></video>
 
-    <!-- Display the decompressed SDP -->
-    <pre class="border border-green-400 p-2 rounded w-3/4 bg-black/50 min-h-[100px]">
-      {{ decompressedSDP }}
+    <!-- Decompressed SDP -->
+    <pre class="border border-lime-400 p-3 rounded-lg w-3/4 bg-black/50 min-h-[100px] mb-6 text-sm overflow-x-auto glow-border">
+{{ decompressedSDP }}
     </pre>
 
-    <!-- Buttons -->
-    <div class="flex flex-row gap-2">
-      <!-- Start / Switch Camera/Mic -->
+    <!-- Action Buttons -->
+    <div class="flex flex-row flex-wrap gap-4">
+      <!-- Start Camera/Mic -->
       <button
-        class="px-4 py-2 border border-green-400 hover:bg-green-400 hover:text-black rounded"
+        class="px-5 py-2 border border-lime-400 text-lime-300 hover:bg-lime-400 hover:text-black rounded-full transition-colors duration-300 shadow-neon"
         @click="startCamera"
       >
         Start Camera
@@ -65,11 +108,20 @@
 
       <!-- Mute/Unmute Audio -->
       <button
-        class="px-4 py-2 border border-green-400 hover:bg-green-400 hover:text-black rounded"
-        @click="toggleMute"
         v-if="localStream"
+        class="px-5 py-2 border border-lime-400 text-lime-300 hover:bg-lime-400 hover:text-black rounded-full transition-colors duration-300 shadow-neon"
+        @click="toggleMute"
       >
         {{ isMuted ? 'Unmute Audio' : 'Mute Audio' }}
+      </button>
+
+      <!-- Stop Camera -->
+      <button
+        v-if="localStream"
+        class="px-5 py-2 border border-lime-400 text-lime-300 hover:bg-lime-400 hover:text-black rounded-full transition-colors duration-300 shadow-neon"
+        @click="stopCamera"
+      >
+        Stop Camera
       </button>
     </div>
   </div>
@@ -80,7 +132,8 @@ import { ref, onMounted } from 'vue'
 import jsQR from 'jsqr'
 import { decompressZlibBase64UrlSafe } from '@mastashake08/zlib-urlsafe'
 
-// ======= Reactive State =======
+/** Reactive States */
+const showInfo = ref(false)
 const videoElem = ref(null)
 const cameraActive = ref(false)
 const error = ref('')
@@ -88,27 +141,24 @@ const qrFound = ref(false)
 const qrText = ref('')
 const decompressedSDP = ref('')
 
-// The single local media stream used for preview + WebRTC sending
+// Single local media stream for preview + WebRTC
 const localStream = ref(null)
+let pc = null
 
-// For enumerating devices
+// Device lists & user selections
 const cameras = ref([])
 const microphones = ref([])
 const selectedCamera = ref('')
 const selectedMicrophone = ref('')
 
-// Track whether audio is muted
+// Mute state
 const isMuted = ref(false)
 
-// Reference to the RTCPeerConnection
-let pc = null
-
-// ======= Lifecycle / Setup =======
+/** onMounted: enumerate devices */
 onMounted(() => {
   loadDeviceList()
 })
 
-// Enumerate audio/video input devices
 async function loadDeviceList() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices()
@@ -127,7 +177,7 @@ async function loadDeviceList() {
   }
 }
 
-// ======= Camera / Mic Control =======
+/** Start Camera & Microphone with chosen devices */
 async function startCamera() {
   if (!selectedCamera.value && !selectedMicrophone.value) {
     error.value = 'Please select a camera and a microphone first.'
@@ -143,14 +193,10 @@ async function startCamera() {
         ? { deviceId: { exact: selectedMicrophone.value } }
         : true,
     }
-
-    // Get (or switch) local media
     localStream.value = await navigator.mediaDevices.getUserMedia(constraints)
     videoElem.value.srcObject = localStream.value
     cameraActive.value = true
-    isMuted.value = false // reset audio to unmuted if we changed streams
-
-    // Start scanning for QR codes
+    isMuted.value = false  // default to unmuted
     requestAnimationFrame(scanFrame)
   } catch (err) {
     error.value = `Camera error: ${err.message}`
@@ -158,19 +204,24 @@ async function startCamera() {
   }
 }
 
-// Toggle the audio track(s) from the local stream
+/** Mute/Unmute local audio tracks */
 function toggleMute() {
   if (!localStream.value) return
-
   isMuted.value = !isMuted.value
-
-  // For each audio track in the local stream, enable or disable it
   localStream.value.getAudioTracks().forEach(track => {
     track.enabled = !isMuted.value
   })
 }
 
-// ======= QR Scanning =======
+/** Stop Camera (turn off tracks, clear stream) */
+function stopCamera() {
+  if (!localStream.value) return
+  localStream.value.getTracks().forEach(t => t.stop())
+  localStream.value = null
+  cameraActive.value = false
+}
+
+/** Continuously scan video feed for QR codes */
 function scanFrame() {
   if (!cameraActive.value) return
 
@@ -198,18 +249,18 @@ function scanFrame() {
   }
 }
 
-// ======= WebRTC: Decompress + Send-Only Answer =======
+/** Decompress QR code's SDP & create send-only WebRTC answer */
 async function handleOfferSDP(scannedString) {
   try {
-    // 1. Decompress the scanned zlib+Base64 string
+    // 1. Decompress the scanned string
     const sdp = await decompressZlibBase64UrlSafe(scannedString)
     decompressedSDP.value = sdp
     console.log('[App] Decompressed offer SDP:', sdp)
 
-    // 2. Create an RTCPeerConnection
+    // 2. Create PeerConnection
     pc = new RTCPeerConnection()
 
-    // 3. Add existing local stream tracks to the PeerConnection
+    // 3. Add local tracks if camera is active
     if (!localStream.value) {
       error.value = 'No local stream. Please start camera/mic first.'
       return
@@ -218,15 +269,15 @@ async function handleOfferSDP(scannedString) {
       pc.addTrack(track, localStream.value)
     })
 
-    // 4. Set the scanned string as the remote offer
+    // 4. Set remote description (offer)
     await pc.setRemoteDescription({ type: 'offer', sdp })
 
-    // 5. Create and set the local answer (send-only from this side)
+    // 5. Create and set local answer
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     console.log('[App] Local answer SDP:', pc.localDescription.sdp)
 
-    // In a real app, also exchange ICE candidates with the remote side
+    // In a real app, also exchange ICE candidates
   } catch (err) {
     error.value = `Decompression/WebRTC error: ${err.message}`
     console.error(err)
@@ -235,5 +286,36 @@ async function handleOfferSDP(scannedString) {
 </script>
 
 <style scoped>
-/* Additional styling if desired */
+/* 
+  A neon-like text glow:
+  Adjust #0f0 to your preference for other neon colors 
+*/
+.neon-text {
+  text-shadow:
+    0 0 5px #0f0,
+    0 0 10px #0f0,
+    0 0 20px #0f0,
+    0 0 40px #0f0;
+}
+
+/* Optional soft glow around borders */
+.glow-border {
+  box-shadow: inset 0 0 5px #0f0;
+}
+
+/* Extra intense neon shadow on buttons, etc. */
+.shadow-neon {
+  box-shadow:
+    0 0 5px rgba(0, 255, 0, 0.5),
+    0 0 15px rgba(0, 255, 0, 0.3);
+}
+
+/* A neon ring around container (or set for .neon-border) */
+.neon-border {
+  border: 1px solid #0f0;
+  box-shadow:
+    0 0 5px #0f0,
+    0 0 10px #0f0,
+    0 0 20px #0f0;
+}
 </style>
