@@ -177,7 +177,7 @@ const qrText = ref('')
 const decompressedSDP = ref('')
 
 // Single local media stream for preview + WebRTC
-const localStream = ref(null)
+const localStream = ref(new MediaStream())
 let pc = null
 
 // Device lists & user selections
@@ -239,7 +239,9 @@ async function startCamera() {
         ? { deviceId: { exact: selectedMicrophone.value } }
         : true,
     }
-    localStream.value = await navigator.mediaDevices.getUserMedia(constraints)
+    const s = await navigator.mediaDevices.getUserMedia(constraints)
+    localStream.value.addTrack(s.getVideoTracks()[0])
+    localStream.value.addTrack(s.getAudioTracks()[0])
     videoElem.value.srcObject = localStream.value
     cameraActive.value = true
     isMuted.value = false
@@ -262,11 +264,12 @@ async function startScreenShare() {
     stopCamera()
 
     const screenStream = await navigator.mediaDevices.getDisplayMedia({
-      video: true
-      // audio: true, // partially supported in some browsers if you want system audio
+      video: true,
+      audio: true, // partially supported in some browsers if you want system audio
     })
 
-    localStream.value = screenStream
+    localStream.value.addTrack(screenStream.getVideoTracks()[0])
+    localStream.value.addTrack(screenStream.getAudioTracks()[0])
     videoElem.value.srcObject = localStream.value
     cameraActive.value = true
     isMuted.value = false
