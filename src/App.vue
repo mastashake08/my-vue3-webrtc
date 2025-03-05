@@ -177,7 +177,7 @@ const qrText = ref('')
 const decompressedSDP = ref('')
 
 // Single local media stream for preview + WebRTC
-const localStream = ref(new MediaStream())
+const localStream = ref(null)
 let pc = null
 
 // Device lists & user selections
@@ -200,6 +200,8 @@ const isScreenShareSupported = computed(() => {
 
 onMounted(() => {
   loadDeviceList()
+  localStream.value = new MediaStream()
+  console.log('MediaStream:', localStream.value)
 })
 
 async function loadDeviceList() {
@@ -229,7 +231,7 @@ async function startCamera() {
 
   try {
     // Stop existing stream first
-    stopCamera()
+    //stopCamera()
 
     const constraints = {
       video: selectedCamera.value
@@ -240,8 +242,10 @@ async function startCamera() {
         : true,
     }
     const s = await navigator.mediaDevices.getUserMedia(constraints)
-    localStream.value.addTrack(s.getVideoTracks()[0])
-    localStream.value.addTrack(s.getAudioTracks()[0])
+    
+    for(const track of s.getTracks()) {
+      localStream.value.addTrack(track)
+    }
     videoElem.value.srcObject = localStream.value
     cameraActive.value = true
     isMuted.value = false
@@ -261,15 +265,16 @@ async function startScreenShare() {
   }
   try {
     // Stop existing stream first
-    stopCamera()
+   // stopCamera()
 
     const screenStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
       audio: true, // partially supported in some browsers if you want system audio
     })
-
-    localStream.value.addTrack(screenStream.getVideoTracks()[0])
-    localStream.value.addTrack(screenStream.getAudioTracks()[0])
+    for(const track of screenStream.getTracks()) {
+      localStream.value.addTrack(track)
+    }
+   console.log('MediaStream:', localStream.value)
     videoElem.value.srcObject = localStream.value
     cameraActive.value = true
     isMuted.value = false
@@ -306,7 +311,7 @@ function stopCamera() {
   if (localStream.value) {
     localStream.value.getTracks().forEach(t => t.stop())
   }
-  localStream.value = null
+  localStream.value = new MediaStream()
   cameraActive.value = false
 }
 
